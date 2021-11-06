@@ -51,13 +51,14 @@ ext: DOLLAR_EXT IDENTIFIER*;
 
 parameter_list: assignable (COMMA assignable)*;
 call_parameter_list:
-	LB (argument (COMMA argument)*)? (
-		COLON call_return_parameter (COMMA call_return_parameter)*
+	LB (argument (COMMA | argument | COMMA argument)*)? (
+		COLON call_return_parameter (COMMA call_return_parameter?)*
 	)? RB;
 call_return_parameter: assignable | IGNORED_RETURN | STAR;
 argument: (AT? (IDENTIFIER | keyword) EQUAL)? (
 		expression
 		| keyword
+		| STAR
 	);
 return_statement_list: LB (expression (',' expression)*)? RB;
 
@@ -65,6 +66,48 @@ prog: DOLLAR_PROG LB parameter_list? RB statement* prog_end;
 prog_end: return | QUITZUG;
 
 proc: IDENTIFIER PROC LB parameter_list? RB statement* ENDPROC;
+
+expression:
+	LB expression RB							# parenthesis
+	| assignable (ASSIGN | ADD_TO) expression	# assignmentExpr
+	| op = (
+		EQUAL
+		| NOT_EQUAL
+		| LESS_THAN
+		| MORE_THAN
+		| LESS_OR_EQUAL
+		| MORE_OR_EQUAL
+	) right = expression # comparison
+	| left = expression op = (
+		EQUAL
+		| NOT_EQUAL
+		| LESS_THAN
+		| MORE_THAN
+		| LESS_OR_EQUAL
+		| MORE_OR_EQUAL
+	) right = expression															# comparison
+	| left = expression op = (AND | OR) right = expression							# conditional
+	| op = (MINUS | INCREMENT | DECREMENT) expression								# unary
+	| left = expression op = (BIT_AND | BIT_OR | BIT_XOR) right = expression		# infix
+	| left = expression op = (BIT_SHIFT_LEFT | BIT_SHIFT_RIGHT) right = expression	# infix
+	| left = expression op = (
+		STAR
+		| SLASH
+		| DOUBLE_SLASH
+		| SLASH_COLON
+	) right = expression										# infix
+	| left = expression op = (PLUS | MINUS) right = expression	# infix
+	| function_call												# function
+	| if_expression												# if
+	| case_expression											# case
+	| expression bracket_expression								# bracket
+	| value = literal											# literalExpr
+	| value = (
+		IDENTIFIER
+		| FIELD_IDENTIFIER
+		| AT_VARIABLE
+		| RTMFILE_NAME
+	) # identifier;
 
 statement:
 	expression
@@ -81,9 +124,6 @@ do_block: DO statement* END;
 
 while_statement: WHILE expression statement*;
 
-expression: assignment | conditional_or_expression;
-
-assignment: assignable (ASSIGN | ADD_TO) expression;
 assignable: (FIELD_IDENTIFIER | IDENTIFIER | AT_VARIABLE) bracket_expression?;
 
 function_call: (IDENTIFIER | function_keyword) call_parameter_list;
@@ -100,68 +140,6 @@ if_expression: IF expression THEN? statement (ELSE statement)?;
 
 // Can case be used on anything other than a codestring?
 case_expression: CASE expression statement+ ENDCASE;
-
-conditional_or_expression:
-	conditional_and_expression (OR conditional_and_expression)*;
-
-conditional_and_expression:
-	inclusive_or_expression (AND inclusive_or_expression)*;
-
-inclusive_or_expression:
-	exclusive_or_expression (BIT_OR exclusive_or_expression)*;
-
-exclusive_or_expression:
-	and_expression (BIT_XOR and_expression)*;
-
-and_expression:
-	equality_expression (BIT_AND equality_expression)*;
-
-equality_expression:
-	relational_expression (
-		(EQUAL | NOT_EQUAL) relational_expression
-	)*
-	| ((EQUAL | NOT_EQUAL) relational_expression)+;
-
-relational_expression:
-	shift_expression (
-		(LESS_THAN | MORE_THAN | LESS_OR_EQUAL | MORE_OR_EQUAL) shift_expression
-	)*
-	| (
-		(LESS_THAN | MORE_THAN | LESS_OR_EQUAL | MORE_OR_EQUAL) shift_expression
-	)+;
-
-shift_expression:
-	additive_expression (
-		(BIT_SHIFT_LEFT | BIT_SHIFT_RIGHT) additive_expression
-	)*;
-
-additive_expression:
-	multiplicative_expression (
-		(PLUS | MINUS) multiplicative_expression
-	)*;
-
-multiplicative_expression:
-	unary_expression (
-		(STAR | SLASH | DOUBLE_SLASH |) unary_expression
-	)*;
-
-unary_expression:
-	primary_expression
-	| MINUS unary_expression
-	| INCREMENT unary_expression
-	| DECREMENT unary_expression;
-
-primary_expression: (
-		literal
-		| LB expression RB
-		| IDENTIFIER
-		| FIELD_IDENTIFIER
-		| AT_VARIABLE
-		| RTMFILE_NAME
-		| function_call
-		| if_expression
-		| case_expression
-	) bracket_expression?;
 
 //add dates, hex, ?
 literal: NUMERIC_LITERAL | STRING_LITERAL | DATE_LITERAL;

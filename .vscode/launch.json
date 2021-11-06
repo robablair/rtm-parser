@@ -19,7 +19,8 @@
             "input": "examples/input.RTM",
             "grammar": "grammars/RtmParser.g4",
             "printParseTree": true,
-            "visualParseTree": false
+            "visualParseTree": false,
+            "startRule": "start"
         }
     ]
 }
