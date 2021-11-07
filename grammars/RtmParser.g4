@@ -52,7 +52,9 @@ ext: DOLLAR_EXT IDENTIFIER*;
 parameter_list: assignable (COMMA assignable)*;
 call_parameter_list:
 	LB (argument (COMMA | argument | COMMA argument)*)? (
-		COLON call_return_parameter (COMMA call_return_parameter?)*
+		COLON call_return_parameter (
+			COMMA call_return_parameter?
+		)*
 	)? RB;
 call_return_parameter: assignable | IGNORED_RETURN | STAR;
 argument: (AT? (IDENTIFIER | keyword) EQUAL)? (
@@ -65,7 +67,8 @@ return_statement_list: LB (expression (',' expression)*)? RB;
 prog: DOLLAR_PROG LB parameter_list? RB statement* prog_end;
 prog_end: return | QUITZUG;
 
-proc: IDENTIFIER PROC LB parameter_list? RB statement* ENDPROC;
+proc:
+	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC;
 
 expression:
 	LB expression RB							# parenthesis
@@ -113,16 +116,20 @@ statement:
 	expression
 	| do_block
 	| while_statement
+	| repeat_statement
+	| until_statement
 	| return
 	| SEMI_COLON
 	| name_include
-	| keyword //todo refine this
+	| statement_keyword
 	| cursor_movment
 	| display_separator;
 
 do_block: DO statement* END;
 
 while_statement: WHILE expression statement*;
+repeat_statement: REPEAT statement*;
+until_statement: UNTIL expression statement*;
 
 assignable: (FIELD_IDENTIFIER | IDENTIFIER | AT_VARIABLE) bracket_expression?;
 
@@ -130,11 +137,9 @@ function_call: (IDENTIFIER | function_keyword) call_parameter_list;
 
 // This doesn't handle TEMP.VAR[1[2,3]] properly yet. (When no comma separates the '1' and the '[')
 bracket_expression:
-	LSB expression (COMMA expression)* RSB
-	| LSB expression (COMMA expression)* COMMA? substring_argument RSB
-	| LSB substring_argument RSB;
-substring_argument:
-	LSB expression COMMA (expression | STAR) RSB;
+	LSB (expression | bracket_expression | STAR) (
+		COMMA? (expression | bracket_expression | STAR)
+	)* RSB;
 
 if_expression: IF expression THEN? statement (ELSE statement)?;
 
@@ -200,6 +205,24 @@ function_keyword:
 	| OUTIMM
 	| DIE;
 
+statement_keyword:
+	EXIT
+	| DOWN
+	| ERASE
+	| CR
+	| BACK
+	| BEEP
+	| CLEAR
+	| LEFT
+	| RIGHT
+	| TABSTOP
+	| UP
+	| FLASH
+	| HI
+	| LO
+	| OUTONLY
+	| FIXERRS;
+
 keyword:
 	RTM
 	| OVERLAY
@@ -218,7 +241,6 @@ keyword:
 	| UNTIL
 	| WHILE
 	| REPEAT
-	| EXIT
 	| IF
 	| THEN
 	| ELSE
@@ -245,19 +267,6 @@ keyword:
 	| TEST
 	| TESTUSER
 	| USERDATA
-	| DOWN
-	| ERASE
-	| CR
-	| BACK
-	| BEEP
-	| CLEAR
-	| LEFT
-	| RIGHT
-	| TABSTOP
-	| UP
-	| FLASH
-	| HI
-	| LO
 	| KEYED
 	| NOABORT
 	| ADD
@@ -265,6 +274,4 @@ keyword:
 	| FIRST
 	| NEXT
 	| FIND
-	| FND
-	| OUTONLY
-	| FIXERRS;
+	| FND;

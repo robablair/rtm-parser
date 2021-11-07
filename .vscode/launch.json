@@ -10,7 +10,7 @@
             "args": ["${workspaceFolder}/examples/input.RTM"],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
-            "console": "integratedTerminal"
+            "console": "internalConsole"
         },
         {
             "name": "Debug ANTLR4 grammar",
