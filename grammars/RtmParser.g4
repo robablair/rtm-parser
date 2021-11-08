@@ -31,9 +31,9 @@ data: DOLLAR_DATA (data_field | name_include)*;
 data_shared: DOLLAR_DATA_SHARED (data_field | name_include)*;
 data_ext: DOLLAR_EXTDATA (data_field | name_include)*;
 data_field: (
-		(((FILL | IDENTIFIER) EQUAL)? IDENTIFIER | FILL) edit_mask
-	)
-	| FIELD_IDENTIFIER;
+		(((FILL | IDENTIFIER) EQUAL)? IDENTIFIER | FILL) edit_mask?
+		| FIELD_IDENTIFIER
+	);
 edit_mask: (
 		CHAR_MASK
 		| NUMERIC_MASK
@@ -45,7 +45,9 @@ edit_mask: (
 group_prefix: PREFIX IDENTIFIER;
 group_mask: LSB (data_field COMMA?)+ RSB;
 code_string_mask:
-	CODE_STRING_START CODE_STRING_VALUE (CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE)* CODE_STRING_END;
+	CODE_STRING_START CODE_STRING_VALUE (
+		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE
+	)* CODE_STRING_END;
 
 ext: DOLLAR_EXT IDENTIFIER*;
 
