@@ -27,9 +27,10 @@ declarations: files? (data | data_shared)? data_ext? ext?;
 
 files: DOLLAR_FILES IDENTIFIER*;
 
-data: DOLLAR_DATA (data_field | name_include)*;
-data_shared: DOLLAR_DATA_SHARED (data_field | name_include)*;
-data_ext: DOLLAR_EXTDATA (data_field | name_include)*;
+data: DOLLAR_DATA data_declarations;
+data_shared: DOLLAR_DATA_SHARED data_declarations;
+data_ext: DOLLAR_EXTDATA data_declarations;
+data_declarations: (data_field | name_include) (COMMA? (data_field | name_include))*;
 data_field: (
 		(((FILL | IDENTIFIER) EQUAL)? IDENTIFIER | FILL) edit_mask?
 		| FIELD_IDENTIFIER
