@@ -36,9 +36,7 @@ data_field: (
 		| FIELD_IDENTIFIER
 	);
 edit_mask: (
-		CHAR_MASK
-		| NUMERIC_MASK
-		| DATA_MASK
+		IDENTIFIER
 		| FIELD_MASK
 		| code_string_mask
 		| group_mask
