@@ -15,9 +15,7 @@ overlay: overlay_name declarations prog (proc | name_include)*;
 source_end: DOLLAR_END;
 
 //TODO: allow @ ?
-name_definition: DOLLAR_NAME (name_body | name_terminator);
-name_body: IDENTIFIER (data_field* | proc* | statement*);
-name_terminator: ELLIPSIS DOT*;
+name_definition: DOLLAR_NAME (IDENTIFIER | NAME_END) NAME_TEXT*;
 name_include:
 	DOLLAR_INCLUDE (STAR | IDENTIFIER) (LB IDENTIFIER RB)?;
 
@@ -27,22 +25,27 @@ declarations: files? (data | data_shared)? data_ext? ext?;
 
 files: DOLLAR_FILES IDENTIFIER*;
 
-data: DOLLAR_DATA data_declarations;
-data_shared: DOLLAR_DATA_SHARED data_declarations;
-data_ext: DOLLAR_EXTDATA data_declarations;
-data_declarations: (data_field | name_include) (COMMA? (data_field | name_include))*;
-data_field: (
-		(((FILL | IDENTIFIER) EQUAL)? IDENTIFIER | FILL) edit_mask?
-		| FIELD_IDENTIFIER
-	);
+data: DOLLAR_DATA DATA_NEWLINE* data_declarations DATA_NEWLINE*;
+data_shared:
+	DOLLAR_DATA_SHARED DATA_NEWLINE* data_declarations DATA_NEWLINE*;
+data_ext:
+	DOLLAR_EXTDATA DATA_NEWLINE* data_declarations DATA_NEWLINE*;
+data_declarations: (data_field | name_include) (
+		COMMA? DATA_NEWLINE* (data_field | name_include)
+	)*;
+data_field:
+	IDENTIFIER edit_mask? (STAR NUMERIC_LITERAL)?
+	| (FILL | IDENTIFIER) EQUAL IDENTIFIER edit_mask?
+	| FILL EQUAL IDENTIFIER
+	| FIELD_IDENTIFIER;
 edit_mask: (
 		IDENTIFIER
-		| FIELD_MASK
+		| COPY_MASK (PREFIX IDENTIFIER)?
 		| code_string_mask
 		| group_mask
-	) (STAR NUMERIC_LITERAL)? group_prefix?;
-group_prefix: PREFIX IDENTIFIER;
-group_mask: LSB (data_field COMMA?)+ RSB;
+	);
+group_mask:
+	DATA_NEWLINE* LSB DATA_NEWLINE* (data_field COMMA? DATA_NEWLINE*)+ DATA_NEWLINE* RSB;
 code_string_mask:
 	CODE_STRING_START CODE_STRING_VALUE (
 		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE
