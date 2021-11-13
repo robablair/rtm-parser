@@ -10,7 +10,7 @@ start:
 		| EOF
 	);
 
-overlay: overlay_name declarations prog (proc | name_include)*;
+overlay: overlay_name declarations prog (proc | name_include)* abort?;
 
 source_end: DOLLAR_END;
 
@@ -21,18 +21,25 @@ name_include:
 
 overlay_name: DOLLAR_ENTRY IDENTIFIER;
 
-declarations: files? (data | data_shared)? data_ext? ext?;
+declarations: files? data_area* ext?;
 
-files: DOLLAR_FILES IDENTIFIER*;
+files: DOLLAR_FILES (IDENTIFIER COMMA?)*;
 
-data: DOLLAR_DATA DATA_NEWLINE* data_declarations DATA_NEWLINE*;
-data_shared:
-	DOLLAR_DATA_SHARED DATA_NEWLINE* data_declarations DATA_NEWLINE*;
-data_ext:
-	DOLLAR_EXTDATA DATA_NEWLINE* data_declarations DATA_NEWLINE*;
-data_declarations: (data_field | name_include) (
+data_area:
+	data
+	| data_shared
+	| data_ext
+	| data_scrn
+	| data_user;
+data: DOLLAR_DATA data_declarations?;
+data_shared: DOLLAR_DATA_SHARED data_declarations?;
+data_ext: DOLLAR_EXTDATA data_declarations?;
+data_scrn: DOLLAR_SCRNDATA data_declarations?;
+data_user: DOLLAR_USERDATA data_declarations?;
+data_declarations:
+	DATA_NEWLINE+ (data_field | name_include) (
 		COMMA? DATA_NEWLINE* (data_field | name_include)
-	)*;
+	)* DATA_NEWLINE*;
 data_field:
 	IDENTIFIER edit_mask? (STAR NUMERIC_LITERAL)?
 	| (FILL | IDENTIFIER) EQUAL IDENTIFIER edit_mask?
@@ -45,15 +52,17 @@ edit_mask: (
 		| group_mask
 	);
 group_mask:
-	DATA_NEWLINE* LSB DATA_NEWLINE* (data_field COMMA? DATA_NEWLINE*)+ DATA_NEWLINE* RSB;
+	DATA_NEWLINE* LSB DATA_NEWLINE* (
+		data_field COMMA? DATA_NEWLINE*
+	)+ DATA_NEWLINE* RSB;
 code_string_mask:
 	CODE_STRING_START CODE_STRING_VALUE (
 		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE
 	)* CODE_STRING_END;
 
-ext: DOLLAR_EXT IDENTIFIER*;
+ext: DOLLAR_EXT (IDENTIFIER COMMA?)*;
 
-parameter_list: assignable (COMMA assignable)*;
+parameter_list: (assignable | STAR) (COMMA (assignable | STAR))*;
 call_parameter_list:
 	LB (argument (COMMA | argument | COMMA argument)*)? (
 		COLON call_return_parameter (
@@ -72,7 +81,14 @@ prog: DOLLAR_PROG LB parameter_list? RB statement* prog_end;
 prog_end: return | QUITZUG;
 
 proc:
-	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC;
+	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC (terminator_statement)*;
+
+abort: DOLLAR_ABORT (LB parameter_list? RB)? statement* terminator_statement;
+
+terminator_statement:
+	return
+	| QUITZUG
+	| DIE LB NUMERIC_LITERAL RB;
 
 expression:
 	LB expression RB							# parenthesis
@@ -137,7 +153,8 @@ until_statement: UNTIL expression statement*;
 
 assignable: (FIELD_IDENTIFIER | IDENTIFIER | AT_VARIABLE) bracket_expression?;
 
-function_call: (IDENTIFIER | function_keyword) call_parameter_list;
+function_call: (IDENTIFIER | function_keyword) call_parameter_list
+	| OVERLAY IDENTIFIER call_parameter_list;
 
 // This doesn't handle TEMP.VAR[1[2,3]] properly yet. (When no comma separates the '1' and the '[')
 bracket_expression:
@@ -151,12 +168,17 @@ if_expression: IF expression THEN? statement (ELSE statement)?;
 case_expression: CASE expression statement+ ENDCASE;
 
 //add dates, hex, ?
-literal: NUMERIC_LITERAL | STRING_LITERAL | DATE_LITERAL;
+literal:
+	NUMERIC_LITERAL
+	| STRING_LITERAL
+	| DATE_LITERAL
+	| HEX_LITERAL;
 
 cursor_movment: LEFT | BACK | RIGHT | CR | UP | DOWN | HAT;
 display_separator: COMMA;
 
 return: RETURN return_statement_list;
+
 
 function_keyword:
 	ALLOC
@@ -191,7 +213,6 @@ function_keyword:
 	| MIN
 	| RANDOM
 	| REM
-	| ALTSCR
 	| DISCARD
 	| ERROR
 	| RC
@@ -224,7 +245,10 @@ statement_keyword:
 	| FLASH
 	| HI
 	| LO
+	| ALTSCR
 	| OUTONLY
+	| OUT
+	| NOABORT
 	| FIXERRS;
 
 keyword:
@@ -272,7 +296,6 @@ keyword:
 	| TESTUSER
 	| USERDATA
 	| KEYED
-	| NOABORT
 	| ADD
 	| DEL
 	| FIRST
