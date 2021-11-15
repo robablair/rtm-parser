@@ -37,9 +37,9 @@ data_ext: DOLLAR_EXTDATA data_declarations?;
 data_scrn: DOLLAR_SCRNDATA data_declarations?;
 data_user: DOLLAR_USERDATA data_declarations?;
 data_declarations:
-	DATA_NEWLINE+ (data_field | name_include) (
-		COMMA? DATA_NEWLINE* (data_field | name_include)
-	)* DATA_NEWLINE*;
+	NEWLINE+ (data_field | name_include) (
+		COMMA? NEWLINE* (data_field | name_include)
+	)* NEWLINE*;
 data_field:
 	IDENTIFIER edit_mask? (STAR NUMERIC_LITERAL)?
 	| (FILL | IDENTIFIER) EQUAL IDENTIFIER edit_mask?
@@ -52,9 +52,9 @@ edit_mask: (
 		| group_mask
 	);
 group_mask:
-	DATA_NEWLINE* LSB DATA_NEWLINE* (
-		data_field COMMA? DATA_NEWLINE*
-	)+ DATA_NEWLINE* RSB;
+	NEWLINE* LSB NEWLINE* (
+		data_field COMMA? NEWLINE*
+	)+ NEWLINE* RSB;
 code_string_mask:
 	CODE_STRING_START CODE_STRING_VALUE (
 		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE
@@ -83,7 +83,7 @@ prog_end: return | QUITZUG;
 proc:
 	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC (terminator_statement)*;
 
-abort: DOLLAR_ABORT (LB parameter_list? RB)? statement* terminator_statement;
+abort: DOLLAR_ABORT (LB parameter_list? RB)? statement* terminator_statement?;
 
 terminator_statement:
 	return
