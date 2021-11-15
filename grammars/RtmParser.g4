@@ -10,7 +10,8 @@ start:
 		| EOF
 	);
 
-overlay: overlay_name declarations prog (proc | name_include)* abort?;
+overlay:
+	overlay_name declarations prog (proc | name_include)* statement* abort?; //statements outide of procs? Probably a mistake, does RTM not produce compile error?
 
 source_end: DOLLAR_END;
 
@@ -31,15 +32,13 @@ data_area:
 	| data_ext
 	| data_scrn
 	| data_user;
-data: DOLLAR_DATA data_declarations?;
-data_shared: DOLLAR_DATA_SHARED data_declarations?;
-data_ext: DOLLAR_EXTDATA data_declarations?;
-data_scrn: DOLLAR_SCRNDATA data_declarations?;
-data_user: DOLLAR_USERDATA data_declarations?;
+data: DOLLAR_DATA data_declarations;
+data_shared: DOLLAR_DATA_SHARED data_declarations;
+data_ext: DOLLAR_EXTDATA data_declarations;
+data_scrn: DOLLAR_SCRNDATA data_declarations;
+data_user: DOLLAR_USERDATA data_declarations;
 data_declarations:
-	NEWLINE+ (data_field | name_include) (
-		COMMA? NEWLINE* (data_field | name_include)
-	)* NEWLINE*;
+	NEWLINE* ((data_field | name_include) COMMA? NEWLINE*)* NEWLINE+;
 data_field:
 	IDENTIFIER edit_mask? (STAR NUMERIC_LITERAL)?
 	| (FILL | IDENTIFIER) EQUAL IDENTIFIER edit_mask?
@@ -52,22 +51,18 @@ edit_mask: (
 		| group_mask
 	);
 group_mask:
-	NEWLINE* LSB NEWLINE* (
-		data_field COMMA? NEWLINE*
-	)+ NEWLINE* RSB;
+	NEWLINE* LSB NEWLINE* (data_field COMMA? NEWLINE*)+ NEWLINE* RSB;
 code_string_mask:
-	CODE_STRING_START CODE_STRING_VALUE (
+	CODE_STRING_START CODE_STRING_DELIM? CODE_STRING_VALUE (
 		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE
 	)* CODE_STRING_END;
 
 ext: DOLLAR_EXT (IDENTIFIER COMMA?)*;
 
-parameter_list: (assignable | STAR) (COMMA (assignable | STAR))*;
+parameter_list: (assignable | STAR) (COMMA? (assignable | STAR))*;
 call_parameter_list:
 	LB (argument (COMMA | argument | COMMA argument)*)? (
-		COLON call_return_parameter (
-			COMMA call_return_parameter?
-		)*
+		COLON (call_return_parameter COMMA?)*
 	)? RB;
 call_return_parameter: assignable | IGNORED_RETURN | STAR;
 argument: (AT? (IDENTIFIER | keyword) EQUAL)? (
@@ -81,9 +76,12 @@ prog: DOLLAR_PROG LB parameter_list? RB statement* prog_end;
 prog_end: return | QUITZUG;
 
 proc:
-	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC (terminator_statement)*;
+	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC (
+		terminator_statement
+	)*;
 
-abort: DOLLAR_ABORT (LB parameter_list? RB)? statement* terminator_statement?;
+abort:
+	DOLLAR_ABORT (LB parameter_list? RB)? statement* terminator_statement?;
 
 terminator_statement:
 	return
@@ -147,9 +145,9 @@ statement:
 
 do_block: DO statement* END;
 
-while_statement: WHILE expression statement*;
-repeat_statement: REPEAT statement*;
-until_statement: UNTIL expression statement*;
+while_statement: WHILE expression statement;
+repeat_statement: REPEAT statement;
+until_statement: UNTIL expression statement;
 
 assignable: (FIELD_IDENTIFIER | IDENTIFIER | AT_VARIABLE) bracket_expression?;
 
@@ -178,7 +176,6 @@ cursor_movment: LEFT | BACK | RIGHT | CR | UP | DOWN | HAT;
 display_separator: COMMA;
 
 return: RETURN return_statement_list;
-
 
 function_keyword:
 	ALLOC
