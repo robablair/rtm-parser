@@ -5,13 +5,16 @@ options {
 }
 
 start:
-	SOURCE_TYPE SOURCE_DESC? (overlay | name_definition)* (
-		source_end
-		| EOF
-	);
+	rtm_source
+	| FREE_TEXT+; // for files that are included with '$INCLUDE FILENAME'
+
+rtm_source: (
+		SOURCE_TYPE SOURCE_DESC? (overlay | name_definition)*
+	)? (source_end | EOF);
 
 overlay:
-	overlay_name declarations prog (proc | name_include)* statement* abort?; //statements outide of procs? Probably a mistake, does RTM not produce compile error?
+	overlay_name declarations prog (proc | name_include)* statement* abort?;
+//statements outide of procs? Probably a mistake, does RTM not produce compile error?
 
 source_end: DOLLAR_END;
 
@@ -27,23 +30,22 @@ declarations: files? data_area* ext?;
 files: DOLLAR_FILES (IDENTIFIER COMMA?)*;
 
 data_area:
-	data
-	| data_shared
-	| data_ext
-	| data_scrn
-	| data_user;
-data: DOLLAR_DATA data_declarations;
-data_shared: DOLLAR_DATA_SHARED data_declarations;
-data_ext: DOLLAR_EXTDATA data_declarations;
-data_scrn: DOLLAR_SCRNDATA data_declarations;
-data_user: DOLLAR_USERDATA data_declarations;
+	(
+		DOLLAR_DATA
+		| DOLLAR_DATA_SHARED
+		| DOLLAR_EXTDATA
+		| DOLLAR_SCRNDATA
+		| DOLLAR_USERDATA
+	) data_declarations;
+
 data_declarations:
 	NEWLINE* ((data_field | name_include) COMMA? NEWLINE*)* NEWLINE+;
 data_field:
-	IDENTIFIER edit_mask? (STAR NUMERIC_LITERAL)?
-	| (FILL | IDENTIFIER) EQUAL IDENTIFIER edit_mask?
-	| FILL EQUAL IDENTIFIER
-	| FIELD_IDENTIFIER;
+	(IDENTIFIER | FIELD_IDENTIFIER | FILL) (
+		edit_mask (STAR NUMERIC_LITERAL)?
+		| (STAR NUMERIC_LITERAL)? group_mask
+		| EQUAL (IDENTIFIER | FIELD_IDENTIFIER) group_mask?
+	)?;
 edit_mask: (
 		IDENTIFIER
 		| COPY_MASK (PREFIX IDENTIFIER)?
@@ -53,8 +55,8 @@ edit_mask: (
 group_mask:
 	NEWLINE* LSB NEWLINE* (data_field COMMA? NEWLINE*)+ NEWLINE* RSB;
 code_string_mask:
-	CODE_STRING_START CODE_STRING_DELIM? CODE_STRING_VALUE (
-		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE
+	CODE_STRING_START CODE_STRING_DELIM? CODE_STRING_VALUE+ (
+		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE+
 	)* CODE_STRING_END;
 
 ext: DOLLAR_EXT (IDENTIFIER COMMA?)*;
@@ -65,15 +67,15 @@ call_parameter_list:
 		COLON (call_return_parameter COMMA?)*
 	)? RB;
 call_return_parameter: assignable | IGNORED_RETURN | STAR;
-argument: (AT? (IDENTIFIER | keyword) EQUAL)? (
+argument: (AT? (IDENTIFIER | argument_keyword) EQUAL)? (
 		expression
-		| keyword
+		| argument_keyword
 		| STAR
-	);
+	)
+	| LB (argument COMMA?)+ RB;
 return_statement_list: LB (expression (',' expression)*)? RB;
 
-prog: DOLLAR_PROG LB parameter_list? RB statement* prog_end;
-prog_end: return | QUITZUG;
+prog: DOLLAR_PROG LB parameter_list? RB statement*;
 
 proc:
 	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC (
@@ -118,17 +120,19 @@ expression:
 		| SLASH_COLON
 	) right = expression										# infix
 	| left = expression op = (PLUS | MINUS) right = expression	# infix
-	| function_call												# function
-	| if_expression												# if
-	| case_expression											# case
-	| expression bracket_expression								# bracket
+	| value = function_call										# function
+	| value = if_expression										# if
+	| value = case_expression									# case
+	| value = expression bracket_expression						# bracket
 	| value = literal											# literalExpr
-	| value = (
-		IDENTIFIER
-		| FIELD_IDENTIFIER
-		| AT_VARIABLE
-		| RTMFILE_NAME
-	) # identifier;
+	| value = identifier_expression								# identifier;
+
+identifier_expression:
+	IDENTIFIER
+	| FIELD_IDENTIFIER
+	| AT_VARIABLE
+	| RTMFILE_NAME
+	| REM;
 
 statement:
 	expression
@@ -136,18 +140,22 @@ statement:
 	| while_statement
 	| repeat_statement
 	| until_statement
-	| return
+	| always_statement
+	| never_statement
+	| terminator_statement
 	| SEMI_COLON
 	| name_include
 	| statement_keyword
-	| cursor_movment
-	| display_separator;
+	| cursor_movement
+	| COMMA;
 
 do_block: DO statement* END;
 
 while_statement: WHILE expression statement;
 repeat_statement: REPEAT statement;
 until_statement: UNTIL expression statement;
+always_statement: ALWAYS statement;
+never_statement: NEVER statement;
 
 assignable: (FIELD_IDENTIFIER | IDENTIFIER | AT_VARIABLE) bracket_expression?;
 
@@ -170,10 +178,10 @@ literal:
 	NUMERIC_LITERAL
 	| STRING_LITERAL
 	| DATE_LITERAL
-	| HEX_LITERAL;
+	| HEX_LITERAL
+	| KEY_LITERAL;
 
-cursor_movment: LEFT | BACK | RIGHT | CR | UP | DOWN | HAT;
-display_separator: COMMA;
+cursor_movement: LEFT | BACK | RIGHT | CR | UP | DOWN | HAT;
 
 return: RETURN return_statement_list;
 
@@ -209,7 +217,6 @@ function_keyword:
 	| MAX
 	| MIN
 	| RANDOM
-	| REM
 	| DISCARD
 	| ERROR
 	| RC
@@ -225,7 +232,8 @@ function_keyword:
 	| SETERR
 	| OUTIF
 	| OUTIMM
-	| DIE;
+	| DIE
+	| KEYED;
 
 statement_keyword:
 	EXIT
@@ -248,54 +256,7 @@ statement_keyword:
 	| NOABORT
 	| FIXERRS;
 
-keyword:
-	RTM
-	| OVERLAY
-	| PROC
-	| RETURN
-	| ENDPROC
-	| QUITZUG
-	| DO
-	| END
-	| CASE
-	| ENDCASE
-	| PROC
-	| ENDPROC
-	| ALWAYS
-	| NEVER
-	| UNTIL
-	| WHILE
-	| REPEAT
-	| IF
-	| THEN
-	| ELSE
-	| AND
-	| OR
-	| ENTRY
-	| ABORT
-	| DATA
-	| EXT
-	| EXTDATA
-	| EXTRACT
-	| FILE
-	| FILES
-	| INCLUDE
-	| LIVE
-	| LIVEUSER
-	| NAME
-	| NEWCLUSTERS
-	| OPT
-	| PROG
-	| RECORD
-	| SCRNDATA
-	| SNAPSHOT
-	| TEST
-	| TESTUSER
-	| USERDATA
-	| KEYED
-	| ADD
-	| DEL
-	| FIRST
-	| NEXT
-	| FIND
-	| FND;
+argument_keyword: DATA | CLEAR | link_keyword;
+
+link_keyword: WRITE | READ | ABORT;
+// | OPEN | CLOSE | CREATE | WRITE_ACC | WRITE_REJ | SET | OPEN_QUEUE | WRITE_EOF | WRITE_ERR;
