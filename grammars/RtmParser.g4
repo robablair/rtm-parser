@@ -13,7 +13,11 @@ rtm_source: (
 	)? (source_end | EOF);
 
 overlay:
-	overlay_name declarations prog (proc | name_include)* statement* abort?;
+	overlay_name files? data_area* ext? prog (
+		proc
+		| name_include
+		| statement
+	)*;
 //statements outide of procs? Probably a mistake, does RTM not produce compile error?
 
 source_end: DOLLAR_END;
@@ -25,14 +29,12 @@ name_include:
 
 overlay_name: DOLLAR_ENTRY IDENTIFIER;
 
-declarations: files? data_area* ext?;
-
-files: DOLLAR_FILES (IDENTIFIER COMMA?)*;
+files: DOLLAR_FILES ((IDENTIFIER | name_include) COMMA?)*;
+ext: DOLLAR_EXT ((IDENTIFIER | name_include) COMMA?)*;
 
 data_area:
 	(
-		DOLLAR_DATA
-		| DOLLAR_DATA_SHARED
+		DOLLAR_DATA (COMMA SHARED)?
 		| DOLLAR_EXTDATA
 		| DOLLAR_SCRNDATA
 		| DOLLAR_USERDATA
@@ -59,19 +61,16 @@ code_string_mask:
 		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE+
 	)* CODE_STRING_END;
 
-ext: DOLLAR_EXT (IDENTIFIER COMMA?)*;
-
 parameter_list: (assignable | STAR) (COMMA? (assignable | STAR))*;
 call_parameter_list:
-	LB (argument (COMMA | argument | COMMA argument)*)? (
-		COLON (call_return_parameter COMMA?)*
-	)? RB;
+	LB (argument COMMA?)* (COLON call_return_parameter_list?)? RB;
+call_return_parameter_list:
+	call_return_parameter (COMMA call_return_parameter)*;
 call_return_parameter: assignable | IGNORED_RETURN | STAR;
-argument: (AT? (IDENTIFIER | argument_keyword) EQUAL)? (
-		expression
-		| argument_keyword
-		| STAR
-	)
+argument:
+	expression
+	| IDENTIFIER EQUAL expression
+	| STAR
 	| LB (argument COMMA?)+ RB;
 return_statement_list: LB (expression (',' expression)*)? RB;
 
@@ -85,10 +84,7 @@ proc:
 abort:
 	DOLLAR_ABORT (LB parameter_list? RB)? statement* terminator_statement?;
 
-terminator_statement:
-	return
-	| QUITZUG
-	| DIE LB NUMERIC_LITERAL RB;
+terminator_statement: return | QUITZUG | DIE LB argument RB;
 
 expression:
 	LB expression RB							# parenthesis
@@ -131,8 +127,7 @@ identifier_expression:
 	IDENTIFIER
 	| FIELD_IDENTIFIER
 	| AT_VARIABLE
-	| RTMFILE_NAME
-	| REM;
+	| RTMFILE_NAME;
 
 statement:
 	expression
@@ -145,24 +140,20 @@ statement:
 	| terminator_statement
 	| SEMI_COLON
 	| name_include
-	| statement_keyword
-	| cursor_movement
 	| COMMA;
 
 do_block: DO statement* END;
 
 while_statement: WHILE expression statement;
-repeat_statement: REPEAT statement;
 until_statement: UNTIL expression statement;
+repeat_statement: REPEAT statement;
 always_statement: ALWAYS statement;
 never_statement: NEVER statement;
 
 assignable: (FIELD_IDENTIFIER | IDENTIFIER | AT_VARIABLE) bracket_expression?;
 
-function_call: (IDENTIFIER | function_keyword) call_parameter_list
-	| OVERLAY IDENTIFIER call_parameter_list;
+function_call: (IDENTIFIER | OVERLAY IDENTIFIER) call_parameter_list;
 
-// This doesn't handle TEMP.VAR[1[2,3]] properly yet. (When no comma separates the '1' and the '[')
 bracket_expression:
 	LSB (expression | bracket_expression | STAR) (
 		COMMA? (expression | bracket_expression | STAR)
@@ -170,10 +161,8 @@ bracket_expression:
 
 if_expression: IF expression THEN? statement (ELSE statement)?;
 
-// Can case be used on anything other than a codestring?
 case_expression: CASE expression statement+ ENDCASE;
 
-//add dates, hex, ?
 literal:
 	NUMERIC_LITERAL
 	| STRING_LITERAL
@@ -181,82 +170,4 @@ literal:
 	| HEX_LITERAL
 	| KEY_LITERAL;
 
-cursor_movement: LEFT | BACK | RIGHT | CR | UP | DOWN | HAT;
-
 return: RETURN return_statement_list;
-
-function_keyword:
-	ALLOC
-	| COPYR
-	| INDEX
-	| LOCK
-	| NOGROUP
-	| PACK
-	| READ
-	| READLOCK
-	| REF
-	| RELEASE
-	| SEGPTR
-	| TESTLOCK
-	| UNLOCK
-	| WRITE
-	| UNPACK
-	| BNUM
-	| DELETE
-	| INIT
-	| APPLY
-	| CONCAT
-	| CONVERT
-	| EXT
-	| LENGTH
-	| MATCH
-	| TRANSLATE
-	| SUBSTR
-	| ABS
-	| EXP2
-	| MAX
-	| MIN
-	| RANDOM
-	| DISCARD
-	| ERROR
-	| RC
-	| TRUNC
-	| WAIT
-	| VID
-	| IN
-	| INFLD
-	| INOPT
-	| SETOPT
-	| VALID
-	| OUT
-	| SETERR
-	| OUTIF
-	| OUTIMM
-	| DIE
-	| KEYED;
-
-statement_keyword:
-	EXIT
-	| DOWN
-	| ERASE
-	| CR
-	| BACK
-	| BEEP
-	| CLEAR
-	| LEFT
-	| RIGHT
-	| TABSTOP
-	| UP
-	| FLASH
-	| HI
-	| LO
-	| ALTSCR
-	| OUTONLY
-	| OUT
-	| NOABORT
-	| FIXERRS;
-
-argument_keyword: DATA | CLEAR | link_keyword;
-
-link_keyword: WRITE | READ | ABORT;
-// | OPEN | CLOSE | CREATE | WRITE_ACC | WRITE_REJ | SET | OPEN_QUEUE | WRITE_EOF | WRITE_ERR;
