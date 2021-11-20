@@ -9,28 +9,28 @@ start:
 	| FREE_TEXT+; // for files that are included with '$INCLUDE FILENAME'
 
 rtm_source: (
-		SOURCE_TYPE SOURCE_DESC? (overlay | name_definition)*
+		SOURCE_DESCRIPTION (overlay | name_definition | NL)*
 	)? (source_end | EOF);
 
 overlay:
-	overlay_name files? data_area* ext? prog (
+	overlay_name NL* files? (data_area | NL)* ext? NL* prog (
 		proc
 		| name_include
 		| statement
+		| NL
 	)*;
 //statements outide of procs? Probably a mistake, does RTM not produce compile error?
 
 source_end: DOLLAR_END;
 
 //TODO: allow @ ?
-name_definition: DOLLAR_NAME (IDENTIFIER | NAME_END) NAME_TEXT*;
-name_include:
-	DOLLAR_INCLUDE (STAR | IDENTIFIER) (LB IDENTIFIER RB)?;
+name_definition: DOLLAR_NAME (ID | NAME_END) FREE_TEXT*;
+name_include: DOLLAR_INCLUDE (STAR | ID) (LB ID RB)?;
 
-overlay_name: DOLLAR_ENTRY IDENTIFIER;
+overlay_name: DOLLAR_ENTRY ID;
 
-files: DOLLAR_FILES ((IDENTIFIER | name_include) COMMA?)*;
-ext: DOLLAR_EXT ((IDENTIFIER | name_include) COMMA?)*;
+files: DOLLAR_FILES NL* ((ID | name_include) (COMMA | NL)+)*;
+ext: DOLLAR_EXT NL* ((ID | name_include) (COMMA | NL)+)*;
 
 data_area:
 	(
@@ -38,46 +38,53 @@ data_area:
 		| DOLLAR_EXTDATA
 		| DOLLAR_SCRNDATA
 		| DOLLAR_USERDATA
-	) data_declarations;
+	) NL* data_declarations?;
 
 data_declarations:
-	NEWLINE* ((data_field | name_include) COMMA? NEWLINE*)* NEWLINE+;
-data_field:
-	(IDENTIFIER | FIELD_IDENTIFIER | FILL) (
+	(data_field | name_include) (
+		(COMMA | NL*) (data_field | name_include)
+	)*;
+data_field: (ID | FIELD_ID | FILL) (
 		edit_mask (STAR NUMERIC_LITERAL)?
 		| (STAR NUMERIC_LITERAL)? group_mask
-		| EQUAL (IDENTIFIER | FIELD_IDENTIFIER) group_mask?
+		| EQUAL (ID | FIELD_ID) group_mask?
 	)?;
 edit_mask: (
-		IDENTIFIER
-		| COPY_MASK (PREFIX IDENTIFIER)?
+		ID
+		| APOSTROPHE_ID (PREFIX ID)?
 		| code_string_mask
 		| group_mask
 	);
-group_mask:
-	NEWLINE* LSB NEWLINE* (data_field COMMA? NEWLINE*)+ NEWLINE* RSB;
+copy_mask: APOSTROPHE_ID (PREFIX ID)?;
+group_mask: NL* LSB NL* (data_field COMMA? NL*)+ NL* RSB;
+
 code_string_mask:
-	CODE_STRING_START CODE_STRING_DELIM? CODE_STRING_VALUE+ (
-		CODE_STRING_DELIM CODE_STRING_DELIM? CODE_STRING_VALUE+
-	)* CODE_STRING_END;
+	CODE_STRING_START (
+		code_string_value (
+			(HAT (NL | WS)+)? HAT code_string_value
+		)*
+	) CODE_STRING_END;
+code_string_value: (CODE_STRING_VALUE | WS)+;
 
-parameter_list: (assignable | STAR) (COMMA? (assignable | STAR))*;
+parameter_list: (assignable | STAR) ((COMMA | NL)* (assignable | STAR))*;
 call_parameter_list:
-	LB (argument COMMA?)* (COLON call_return_parameter_list?)? RB;
+	LB NL* argument_list? NL* (COLON NL* call_return_parameter_list?)? NL* RB;
+argument_list: argument ((COMMA | NL)* argument)* COMMA?;
 call_return_parameter_list:
-	call_return_parameter (COMMA call_return_parameter)*;
-call_return_parameter: assignable | IGNORED_RETURN | STAR;
+	call_return_parameter ((COMMA | NL)+ call_return_parameter)*;
+call_return_parameter: assignable | APOSTROPHE_ID | STAR;
 argument:
-	expression
-	| IDENTIFIER EQUAL expression
+	ID EQUAL expression
+	| RTMFILE_NAME
 	| STAR
-	| LB (argument COMMA?)+ RB;
-return_statement_list: LB (expression (',' expression)*)? RB;
+	| LB NL* argument_list NL* RB
+	| expression;
+return_statement_list: LB (expression (COMMA expression)*)? RB;
 
-prog: DOLLAR_PROG LB parameter_list? RB statement*;
+prog: DOLLAR_PROG LB parameter_list? RB (statement | NL)*;
 
 proc:
-	IDENTIFIER PROC (LB parameter_list? RB)? statement* ENDPROC (
+	PROC_NAME PROC (LB parameter_list? RB)? (statement | NL)* ENDPROC (
 		terminator_statement
 	)*;
 
@@ -86,9 +93,11 @@ abort:
 
 terminator_statement: return | QUITZUG | DIE LB argument RB;
 
+function_call: (ID | OVERLAY ID) call_parameter_list;
+
 expression:
 	LB expression RB							# parenthesis
-	| assignable (ASSIGN | ADD_TO) expression	# assignmentExpr
+	| assignable (ASSIGN | ADD_TO) NL* expression	# assignmentExpr
 	| op = (
 		EQUAL
 		| NOT_EQUAL
@@ -96,26 +105,26 @@ expression:
 		| MORE_THAN
 		| LESS_OR_EQUAL
 		| MORE_OR_EQUAL
-	) right = expression # comparison
-	| left = expression op = (
+	) NL* right = expression # comparison
+	| left = expression NL* op = (
 		EQUAL
 		| NOT_EQUAL
 		| LESS_THAN
 		| MORE_THAN
 		| LESS_OR_EQUAL
 		| MORE_OR_EQUAL
-	) right = expression															# comparison
-	| left = expression op = (AND | OR) right = expression							# conditional
+	) NL* right = expression															# comparison
+	| left = expression NL* op = (AND | OR) NL* right = expression							# conditional
 	| op = (MINUS | INCREMENT | DECREMENT) expression								# unary
-	| left = expression op = (BIT_AND | BIT_OR | BIT_XOR) right = expression		# infix
-	| left = expression op = (BIT_SHIFT_LEFT | BIT_SHIFT_RIGHT) right = expression	# infix
-	| left = expression op = (
+	| left = expression NL* op = (BIT_AND | BIT_OR | BIT_XOR) NL* right = expression		# infix
+	| left = expression NL* op = (BIT_SHIFT_LEFT | BIT_SHIFT_RIGHT) NL* right = expression	# infix
+	| left = expression NL* op = (
 		STAR
 		| SLASH
 		| DOUBLE_SLASH
 		| SLASH_COLON
-	) right = expression										# infix
-	| left = expression op = (PLUS | MINUS) right = expression	# infix
+	) NL* right = expression										# infix
+	| left = expression NL* op = (PLUS | MINUS) NL* right = expression	# infix
 	| value = function_call										# function
 	| value = if_expression										# if
 	| value = case_expression									# case
@@ -123,11 +132,7 @@ expression:
 	| value = literal											# literalExpr
 	| value = identifier_expression								# identifier;
 
-identifier_expression:
-	IDENTIFIER
-	| FIELD_IDENTIFIER
-	| AT_VARIABLE
-	| RTMFILE_NAME;
+identifier_expression: ID | FIELD_ID | AT_VARIABLE;
 
 statement:
 	expression
@@ -142,26 +147,25 @@ statement:
 	| name_include
 	| COMMA;
 
-do_block: DO statement* END;
+do_block: DO (statement | NL)* END;
 
-while_statement: WHILE expression statement;
-until_statement: UNTIL expression statement;
-repeat_statement: REPEAT statement;
-always_statement: ALWAYS statement;
-never_statement: NEVER statement;
+while_statement: WHILE expression NL* statement;
+until_statement: UNTIL expression NL* statement;
+repeat_statement: REPEAT NL* statement;
+always_statement: ALWAYS NL* statement;
+never_statement: NEVER NL* statement;
 
-assignable: (FIELD_IDENTIFIER | IDENTIFIER | AT_VARIABLE) bracket_expression?;
-
-function_call: (IDENTIFIER | OVERLAY IDENTIFIER) call_parameter_list;
+assignable: (FIELD_ID | ID | AT_VARIABLE) bracket_expression?;
 
 bracket_expression:
 	LSB (expression | bracket_expression | STAR) (
 		COMMA? (expression | bracket_expression | STAR)
 	)* RSB;
 
-if_expression: IF expression THEN? statement (ELSE statement)?;
+if_expression:
+	IF expression THEN? NL* statement NL* (ELSE NL* statement)?;
 
-case_expression: CASE expression statement+ ENDCASE;
+case_expression: CASE expression (statement | NL)+ ENDCASE;
 
 literal:
 	NUMERIC_LITERAL
