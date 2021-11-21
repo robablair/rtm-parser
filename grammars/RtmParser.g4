@@ -25,10 +25,10 @@ overlay:
 source_end: DOLLAR_END;
 
 //TODO: allow @ ?
-name_definition: DOLLAR_NAME (ID | NAME_END) FREE_TEXT*;
+name_definition: DOLLAR_NAME (NAME_ID | NAME_END) NL FREE_TEXT*;
 name_include:
-	DOLLAR_INCLUDE (STAR | ID | DATA_ID_OR_MASK) (
-		LB (ID | DATA_ID_OR_MASK) RB
+	DOLLAR_INCLUDE INCLUDE_FILENAME (
+		LB INCLUDE_NAME RB
 	)?;
 
 overlay_name: DOLLAR_ENTRY ID;

@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 using Antlr4.Runtime;
 
 namespace TestAntlr
@@ -21,9 +23,11 @@ namespace TestAntlr
             {
                 var inputStream = new AntlrInputStream(new StreamReader(file));
                 var lexer = new RtmLexer(inputStream);
+                // printTokens(lexer);
                 var tokenStream = new CommonTokenStream(lexer);
                 var parser = new RtmParser(tokenStream);
                 parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.SLL;
+                // parser.BuildParseTree = false;
                 // lexer.RemoveErrorListeners();
                 // parser.RemoveErrorListeners();
                 // parser.Profile = true;
@@ -38,7 +42,7 @@ namespace TestAntlr
                         Console.WriteLine($"{new FileInfo(file).Name}: {parser.NumberOfSyntaxErrors} errors.");
                         Console.WriteLine($"{watch.Elapsed}");
                     }
-                    // Console.WriteLine($"{watch.Elapsed}");
+                    Console.WriteLine($"{watch.Elapsed}");
                     // Program.profileParser(parser);
                     // Console.WriteLine("= {0}", cst.ToStringTree());
                 }
@@ -49,6 +53,28 @@ namespace TestAntlr
             }
 
             Console.WriteLine();
+        }
+
+        static void printTokens(RtmLexer lexer)
+        {
+            var tokenNames = lexer.RuleNames.Where(x => lexer.TokenTypeMap.ContainsKey(x)).Select(x => new { index = lexer.TokenTypeMap[x], name = x }).ToList();
+            var sb = new StringBuilder();
+            IToken token = null;
+            while ((token = lexer.NextToken()).Type != RtmLexer.Eof)
+            {
+                var tokenName = tokenNames.First(x => x.index == token.Type).name;
+                sb.Append($"[{token.Line},{token.Column}] {tokenName}: {ReplaceNewlines(token.Text)}");
+                if (token.Channel != 0)
+                    sb.Append($" (CHANNEL: {token.Channel})");
+                sb.AppendLine();
+            }
+            Console.WriteLine(sb.ToString());
+            lexer.Reset();
+        }
+
+        static string ReplaceNewlines(string text)
+        {
+            return text.Replace("\r\n", "\\r\\n").Replace("\r", "\\r").Replace("\n", "\\n");
         }
 
         static void profileParser(RtmParser parser)
