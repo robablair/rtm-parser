@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using Antlr4.Runtime;
+using Antlr4.Runtime.Misc;
 
 namespace TestAntlr
 {
@@ -19,39 +21,76 @@ namespace TestAntlr
                 files = System.IO.Directory.GetFiles(args[0]);
             else
                 files = args;
-            foreach (var file in files)
+            var watch = new Stopwatch();
+            var totalWatch = new Stopwatch();
+            for (int i = 0; i < 2; i++)
             {
-                var inputStream = new AntlrInputStream(new StreamReader(file));
-                var lexer = new RtmLexer(inputStream);
-                // printTokens(lexer);
-                var tokenStream = new CommonTokenStream(lexer);
-                var parser = new RtmParser(tokenStream);
-                parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.SLL;
-                // parser.BuildParseTree = false;
-                // lexer.RemoveErrorListeners();
-                // parser.RemoveErrorListeners();
-                // parser.Profile = true;
-                try
+                totalWatch.Restart();
+                var failedToParse = new Collection<FileInfo>();
+                var sllParseTimes = new List<long>();
+                var llParseTimes = new List<long>();
+                foreach (var file in files)
                 {
-                    var watch = new Stopwatch();
-                    watch.Start();
-                    var cst = parser.start();
-                    watch.Stop();
-                    if (parser.NumberOfSyntaxErrors > 0)
+                    var fileInfo = new FileInfo(file);
+                    var inputStream = new AntlrInputStream(new StreamReader(file));
+                    var lexer = new RtmLexer(inputStream);
+                    // printTokens(lexer);
+                    var parser = new RtmParser(new CommonTokenStream(lexer));
+                    parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.SLL;
+                    parser.RemoveErrorListeners();
+                    parser.ErrorHandler = new BailErrorStrategy();
+                    // parser.Profile = true;
+                    try
                     {
-                        Console.WriteLine($"{new FileInfo(file).Name}: {parser.NumberOfSyntaxErrors} errors.");
-                        Console.WriteLine($"{watch.Elapsed}");
+                        watch.Restart();
+                        var cst = parser.start();
+                        watch.Stop();
+                        sllParseTimes.Add(watch.ElapsedMilliseconds);
+                        if (parser.NumberOfSyntaxErrors > 0)
+                        {
+                            failedToParse.Add(fileInfo);
+                            Console.WriteLine($"{fileInfo.Name}: {parser.NumberOfSyntaxErrors} errors.");
+                            Console.WriteLine($"{watch.Elapsed}");
+                        }
+                        // Console.WriteLine($"{watch.Elapsed}");
+                        // Program.profileParser(parser);
+                        // Console.WriteLine("= {0}", cst.ToStringTree());
                     }
-                    Console.WriteLine($"{watch.Elapsed}");
-                    // Program.profileParser(parser);
-                    // Console.WriteLine("= {0}", cst.ToStringTree());
+                    catch (ParseCanceledException)
+                    {
+                        Console.WriteLine($"{fileInfo.Name} failed to parse in SLL mode.");
+                        lexer.Reset();
+                        // parser.Reset();
+                        parser = new RtmParser(new CommonTokenStream(lexer));
+                        parser.AddErrorListener(ConsoleErrorListener<IToken>.Instance);
+                        parser.ErrorHandler = new DefaultErrorStrategy();
+                        parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.LL;
+                        watch.Restart();
+                        var cst = parser.start();
+                        watch.Stop();
+                        llParseTimes.Add(watch.ElapsedMilliseconds);
+                        if (parser.NumberOfSyntaxErrors > 0)
+                        {
+                            failedToParse.Add(fileInfo);
+                            Console.WriteLine($"{fileInfo.Name}: {parser.NumberOfSyntaxErrors} errors.");
+                            Console.WriteLine($"{watch.Elapsed}");
+                        }
+                    }
                 }
-                catch (Exception ex)
+                totalWatch.Stop();
+                Console.WriteLine($"sllParseTimes: {sllParseTimes.Sum()}");
+                Console.WriteLine($"llParseTimes: {llParseTimes.Sum()}");
+                Console.WriteLine($"Total time: {totalWatch.ElapsedMilliseconds}");
+                if (failedToParse.Count > 0)
                 {
-                    Console.WriteLine(ex.Message);
+                    Console.WriteLine("Failed to parse:");
+                    Console.Write(string.Join("\n", failedToParse.Select(x => x.Name)));
+                }
+                else
+                {
+                    Console.WriteLine("All parsed without error");
                 }
             }
-
             Console.WriteLine();
         }
 

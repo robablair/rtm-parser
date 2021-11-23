@@ -13,7 +13,11 @@ rtm_source: (
 	)? (source_end | EOF);
 
 overlay:
-	overlay_name NL* files? (data_area | NL)* ext? NL* prog (
+	overlay_name NL* name_definition* NL* files? NL* name_definition* NL* (
+		data_area
+		| name_definition
+		| NL
+	)* ext? NL* prog (
 		proc
 		| abort
 		| name_include
@@ -27,14 +31,12 @@ source_end: DOLLAR_END;
 //TODO: allow @ ?
 name_definition: DOLLAR_NAME (NAME_ID | NAME_END) NL FREE_TEXT*;
 name_include:
-	DOLLAR_INCLUDE INCLUDE_FILENAME (
-		LB INCLUDE_NAME RB
-	)?;
+	DOLLAR_INCLUDE INCLUDE_FILENAME (LB INCLUDE_NAME RB?)?;
 
-overlay_name: DOLLAR_ENTRY ID;
+overlay_name: DOLLAR_ENTRY NL* ID;
 
-files: DOLLAR_FILES NL* ((ID | name_include) (COMMA | NL)+)*;
-ext: DOLLAR_EXT NL* ((ID | name_include) (COMMA | NL)+)*;
+files: DOLLAR_FILES NL* ((ID | name_include) (COMMA | NL)*)*;
+ext: DOLLAR_EXT NL* ((ID | name_include) (COMMA | NL)*)*;
 
 data_area:
 	(
@@ -46,12 +48,14 @@ data_area:
 
 data_declarations:
 	(data_field | name_include) (
-		(COMMA | NL*) (data_field | name_include)
+		(COMMA | NL)* (data_field | name_include)
 	)*;
 data_field: (DATA_ID_OR_MASK | FIELD_ID | FILL) (
 		edit_mask (STAR NUMERIC_LITERAL)*
 		| (STAR NUMERIC_LITERAL)* group_mask
-		| EQUAL (DATA_ID_OR_MASK | FIELD_ID) group_mask?
+		| EQUAL (DATA_ID_OR_MASK | FIELD_ID) edit_mask? (
+			STAR NUMERIC_LITERAL
+		)* group_mask?
 	)?;
 edit_mask: (
 		DATA_ID_OR_MASK
@@ -60,7 +64,8 @@ edit_mask: (
 		| group_mask
 	);
 copy_mask: COPY_MASK (PREFIX (ID | DATA_ID_OR_MASK))?;
-group_mask: NL* LSB NL* (data_field COMMA? NL*)+ NL* RSB;
+group_mask:
+	NL* LSB ((COMMA | NL)* data_field (COMMA | NL)*)+ NL* RSB;
 
 code_string_mask:
 	CODE_STRING_START (
@@ -78,20 +83,24 @@ call_parameter_list:
 	LB NL* argument_list? NL* (
 		COLON NL* call_return_parameter_list?
 	)? NL* RB;
-argument_list: argument ((COMMA | NL)* argument)* COMMA?;
+argument_list: (argument | COMMA) ((COMMA | NL)* argument)* COMMA?;
 call_return_parameter_list:
 	call_return_parameter ((COMMA | NL)+ call_return_parameter)*;
 call_return_parameter: assignable | IGNORED_RETURN | STAR;
 argument:
-	ID EQUAL expression
+	ID EQUAL (STAR (MINUS | PLUS))? expression
 	| RTMFILE_NAME
 	| STAR
 	| LB NL* argument_list NL* RB
-	| expression;
+	| STAR (MINUS | PLUS) expression
+	| (MINUS | PLUS) expression
+	| REPEAT
+	| APOSTROPHE? expression;
 return_statement_list:
 	LB (expression ((COMMA | NL)+ expression)*)? RB;
 
-prog: DOLLAR_PROG LB parameter_list? RB (statement | NL)*;
+prog:
+	DOLLAR_PROG LB NL* parameter_list? NL* RB (statement | NL)*;
 
 proc:
 	ID PROC (LB parameter_list? RB)? (statement | NL)* ENDPROC (
@@ -103,11 +112,9 @@ abort:
 
 terminator_statement: return | QUITZUG | DIE LB argument RB;
 
-function_call: (ID | OVERLAY ID) call_parameter_list;
-
 expression:
-	LB NL* expression NL* RB						# parenthesis
-	| assignable (ASSIGN | ADD_TO) NL* expression	# assignmentExpr
+	LB NL* expression NL* RB							# parenthesis
+	| assignable NL* (ASSIGN | ADD_TO) NL* expression	# assignmentExpr
 	| op = (
 		EQUAL
 		| NOT_EQUAL
@@ -163,8 +170,8 @@ statement:
 
 do_block: DO (statement | NL)* END;
 
-while_statement: WHILE expression NL* statement;
-until_statement: UNTIL expression NL* statement;
+while_statement: WHILE NL* expression NL* statement;
+until_statement: UNTIL NL* expression NL* statement;
 repeat_statement: REPEAT NL* statement;
 always_statement: ALWAYS NL* statement;
 never_statement: NEVER NL* statement;
@@ -172,14 +179,18 @@ never_statement: NEVER NL* statement;
 assignable: (FIELD_ID | ID | AT_VARIABLE) bracket_expression?;
 
 bracket_expression:
-	LSB (expression | bracket_expression | STAR) (
-		COMMA? (expression | bracket_expression | STAR)
+	LSB NL* (expression | bracket_expression | STAR) (
+		(COMMA | NL)* (expression | bracket_expression | STAR)
 	)* RSB;
 
 if_expression:
-	IF expression THEN? NL* statement NL* (ELSE NL* statement)?;
+	IF NL* expression NL* THEN? NL* statement NL* (
+		ELSE NL* statement
+	)?;
 
 case_expression: CASE expression (statement | NL)+ ENDCASE;
+
+function_call: (ID | OVERLAY ID) call_parameter_list;
 
 literal:
 	NUMERIC_LITERAL
