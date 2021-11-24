@@ -9,34 +9,33 @@ start:
 	| FREE_TEXT+; // for files that are included with '$INCLUDE FILENAME'
 
 rtm_source: (
-		SOURCE_DESCRIPTION (overlay | name_definition | NL)*
+		SOURCE_DESCRIPTION (overlay | name_definition)*
 	)? (source_end | EOF);
 
 overlay:
-	overlay_name NL* name_definition* NL* files? NL* name_definition* NL* (
+	overlay_name name_definition* files? name_definition* (
 		data_area
 		| name_definition
 		| NL
-	)* ext? NL* prog (
+	)* ext? prog (
 		proc
 		| abort
 		| name_include
 		| statement
-		| NL
 	)*;
 //statements outide of procs? Probably a mistake, does RTM not produce compile error?
 
 source_end: DOLLAR_END;
 
 //TODO: allow @ ?
-name_definition: DOLLAR_NAME (NAME_ID | NAME_END) NL FREE_TEXT*;
+name_definition: DOLLAR_NAME (NAME_ID | NAME_END) FREE_TEXT*;
 name_include:
 	DOLLAR_INCLUDE INCLUDE_FILENAME (LB INCLUDE_NAME RB?)?;
 
-overlay_name: DOLLAR_ENTRY NL* ID;
+overlay_name: DOLLAR_ENTRY ID;
 
-files: DOLLAR_FILES NL* ((ID | name_include) (COMMA | NL)*)*;
-ext: DOLLAR_EXT NL* ((ID | name_include) (COMMA | NL)*)*;
+files: DOLLAR_FILES ((ID | name_include) COMMA?)*;
+ext: DOLLAR_EXT ((ID | name_include) COMMA?)*;
 
 data_area:
 	(
@@ -77,33 +76,33 @@ code_string_delim: HAT (WS* NL (NL | WS)* HAT)?;
 code_string_value: (CODE_STRING_VALUE | WS)+;
 
 parameter_list: (assignable | STAR) (
-		(COMMA | NL)* (assignable | STAR)
+		COMMA* (assignable | STAR)
 	)*;
 call_parameter_list:
-	LB NL* argument_list? NL* (
-		COLON NL* call_return_parameter_list?
-	)? NL* RB;
-argument_list: (argument | COMMA) ((COMMA | NL)* argument)* COMMA?;
+	LB argument_list? (
+		COLON call_return_parameter_list?
+	)? RB;
+argument_list: (argument | COMMA) (COMMA* argument)* COMMA?;
 call_return_parameter_list:
-	call_return_parameter ((COMMA | NL)+ call_return_parameter)*;
+	call_return_parameter (COMMA? call_return_parameter)*;
 call_return_parameter: assignable | IGNORED_RETURN | STAR;
 argument:
 	ID EQUAL (STAR (MINUS | PLUS))? expression
 	| RTMFILE_NAME
 	| STAR
-	| LB NL* argument_list NL* RB
+	| LB argument_list RB
 	| STAR (MINUS | PLUS) expression
 	| (MINUS | PLUS) expression
 	| REPEAT
 	| APOSTROPHE? expression;
 return_statement_list:
-	LB (expression ((COMMA | NL)+ expression)*)? RB;
+	LB (expression (COMMA+ expression)*)? RB;
 
 prog:
-	DOLLAR_PROG LB NL* parameter_list? NL* RB (statement | NL)*;
+	DOLLAR_PROG LB parameter_list? RB statement*;
 
 proc:
-	ID PROC (LB parameter_list? RB)? (statement | NL)* ENDPROC (
+	ID PROC (LB parameter_list? RB)? statement* ENDPROC (
 		terminator_statement
 	)*;
 
@@ -113,8 +112,8 @@ abort:
 terminator_statement: return | QUITZUG | DIE LB argument RB;
 
 expression:
-	LB NL* expression NL* RB							# parenthesis
-	| assignable NL* (ASSIGN | ADD_TO) NL* expression	# assignmentExpr
+	LB expression RB							# parenthesis
+	| assignable (ASSIGN | ADD_TO) expression	# assignmentExpr
 	| op = (
 		EQUAL
 		| NOT_EQUAL
@@ -122,29 +121,29 @@ expression:
 		| MORE_THAN
 		| LESS_OR_EQUAL
 		| MORE_OR_EQUAL
-	) NL* right = expression # comparison
-	| left = expression NL* op = (
+	) right = expression # comparison
+	| left = expression op = (
 		EQUAL
 		| NOT_EQUAL
 		| LESS_THAN
 		| MORE_THAN
 		| LESS_OR_EQUAL
 		| MORE_OR_EQUAL
-	) NL* right = expression															# comparison
-	| left = expression NL* op = (AND | OR) NL* right = expression						# conditional
+	) right = expression															# comparison
+	| left = expression op = (AND | OR) right = expression						# conditional
 	| op = (MINUS | INCREMENT | DECREMENT) expression									# unary
-	| left = expression NL* op = (BIT_AND | BIT_OR | BIT_XOR) NL* right = expression	# infix
-	| left = expression NL* op = (
+	| left = expression op = (BIT_AND | BIT_OR | BIT_XOR) right = expression	# infix
+	| left = expression op = (
 		BIT_SHIFT_LEFT
 		| BIT_SHIFT_RIGHT
-	) NL* right = expression # infix
-	| left = expression NL* op = (
+	) right = expression # infix
+	| left = expression op = (
 		STAR
 		| SLASH
 		| DOUBLE_SLASH
 		| SLASH_COLON
-	) NL* right = expression											# infix
-	| left = expression NL* op = (PLUS | MINUS) NL* right = expression	# infix
+	) right = expression											# infix
+	| left = expression op = (PLUS | MINUS) right = expression	# infix
 	| value = function_call												# function
 	| value = if_expression												# if
 	| value = case_expression											# case
@@ -168,27 +167,27 @@ statement:
 	| COMMA
 	| HAT;
 
-do_block: DO (statement | NL)* END;
+do_block: DO statement* END;
 
-while_statement: WHILE NL* expression NL* statement;
-until_statement: UNTIL NL* expression NL* statement;
-repeat_statement: REPEAT NL* statement;
-always_statement: ALWAYS NL* statement;
-never_statement: NEVER NL* statement;
+while_statement: WHILE expression statement;
+until_statement: UNTIL expression statement;
+repeat_statement: REPEAT statement;
+always_statement: ALWAYS statement;
+never_statement: NEVER statement;
 
 assignable: (FIELD_ID | ID | AT_VARIABLE) bracket_expression?;
 
 bracket_expression:
-	LSB NL* (expression | bracket_expression | STAR) (
-		(COMMA | NL)* (expression | bracket_expression | STAR)
+	LSB (expression | bracket_expression | STAR) (
+		COMMA* (expression | bracket_expression | STAR)
 	)* RSB;
 
 if_expression:
-	IF NL* expression NL* THEN? NL* statement NL* (
-		ELSE NL* statement
+	IF expression THEN? statement (
+		ELSE statement
 	)?;
 
-case_expression: CASE expression (statement | NL)+ ENDCASE;
+case_expression: CASE expression statement+ ENDCASE;
 
 function_call: (ID | OVERLAY ID) call_parameter_list;
 

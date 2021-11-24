@@ -120,7 +120,7 @@ NL:
 		| '\u0085' // <Next Line CHARACTER (U+0085)>'
 		| '\u2028' //'<Line Separator CHARACTER (U+2028)>'
 		| '\u2029'
-	); //'<Paragraph Separator CHARACTER (U+2029)>'
+	) -> channel(HIDDEN); //'<Paragraph Separator CHARACTER (U+2029)>'
 
 ERROR_CHAR:
 	.; //If no other tokens match. Ensures lexer does not fail and error can be handled in parser.
@@ -175,10 +175,10 @@ INCLUDE_FILENAME: (
 	);
 INCLUDE_LB:
 	LB -> type(LB), popMode, pushMode(INCLUDE_NAME_MODE);
-INCLUDE_FILE_END: NL -> type(NL), popMode;
+INCLUDE_FILE_END: NL -> type(NL), channel(HIDDEN), popMode;
 INCLUDE_FILE_INLINE_COMMENT:
 	INLINE_COMMENT -> type(INLINE_COMMENT), popMode, pushMode(COMMENT_MODE), channel(COMMENTS_CHANNEL);
-INCLUDE_FILE_WHITESPACE: WS+? -> skip;
+INCLUDE_FILE_WHITESPACE: WS+? -> channel(HIDDEN);
 INCLUDE_FILE_ERROR_CHAR: ERROR_CHAR -> type(ERROR_CHAR);
 
 mode INCLUDE_NAME_MODE;
@@ -187,7 +187,7 @@ INCLUDE_RB:
 	RB -> type(RB), popMode, pushMode(IGNORE_REST_OF_LINE);
 INCLUDE_NAME_SPACE:
 	WHITESPACE -> more, popMode, pushMode(IGNORE_REST_OF_LINE);
-INCLUDE_NAME_END: NL -> type(NL), popMode;
+INCLUDE_NAME_END: NL -> type(NL), channel(HIDDEN), popMode;
 INCLUDE_NAME_FULL_LINE_COMMENT:
 	FULL_LINE_COMMENT -> channel(COMMENTS_CHANNEL), type(FULL_LINE_COMMENT), popMode;
 INCLUDE_NAME_ERROR_CHAR: ERROR_CHAR -> type(ERROR_CHAR);
@@ -225,7 +225,7 @@ AFTER_NAME_FREE_TEXT:
 mode IGNORE_REST_OF_LINE;
 POST_INCLUDE_FREE_TEXT:
 	INPUTCHARACTER+ -> type(INLINE_COMMENT), channel(COMMENTS_CHANNEL);
-POST_INCLUDE_NEWLINE: NL -> type(NL), popMode;
+POST_INCLUDE_NEWLINE: NL -> type(NL), channel(HIDDEN), popMode;
 
 mode END_OF_SOURCE;
 END_TEXT:
@@ -236,7 +236,7 @@ COMMENT_END1:
 	'>>' -> type(INLINE_COMMENT), channel(COMMENTS_CHANNEL), popMode;
 COMMENT_TEXT_SINGLE_ARROW:
 	'>' -> type(INLINE_COMMENT), channel(COMMENTS_CHANNEL);
-COMMENT_END2: NL -> type(NL), popMode;
+COMMENT_END2: NL -> type(NL), channel(HIDDEN), popMode;
 COMMENT_TEXT:
 	NON_RIGHT_ARROW_CHARACTER+ -> type(INLINE_COMMENT), channel(COMMENTS_CHANNEL);
 COMMENT_MODE_ERROR_CHAR: ERROR_CHAR -> type(ERROR_CHAR);
