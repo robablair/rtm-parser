@@ -39,7 +39,7 @@ namespace TestAntlr
                     parser.Interpreter.PredictionMode = Antlr4.Runtime.Atn.PredictionMode.SLL;
                     parser.RemoveErrorListeners();
                     parser.ErrorHandler = new BailErrorStrategy();
-                    // parser.Profile = true;
+                    parser.Profile = true;
                     try
                     {
                         watch.Restart();
@@ -52,9 +52,6 @@ namespace TestAntlr
                             Console.WriteLine($"{fileInfo.Name}: {parser.NumberOfSyntaxErrors} errors.");
                             Console.WriteLine($"{watch.Elapsed}");
                         }
-                        // Console.WriteLine($"{watch.Elapsed}");
-                        // Program.profileParser(parser);
-                        // Console.WriteLine("= {0}", cst.ToStringTree());
                     }
                     catch (ParseCanceledException)
                     {
@@ -76,6 +73,11 @@ namespace TestAntlr
                             Console.WriteLine($"{watch.Elapsed}");
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                    Program.profileParser(parser);
                 }
                 totalWatch.Stop();
                 Console.WriteLine($"sllParseTimes: {sllParseTimes.Sum()}");

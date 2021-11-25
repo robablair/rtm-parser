@@ -4,13 +4,8 @@ channels {
 	COMMENTS_CHANNEL
 }
 
-SOURCE_DESCRIPTION: ('RTM' | 'ZUG') INPUTCHARACTER* -> mode(SOURCE);
-NON_SOURCE: . -> more, mode(TEXT_MODE);
+SOURCE_DESCRIPTION: ('RTM' | 'ZUG') {Column == Text.Length && Line == 1}? INPUTCHARACTER*;
 
-mode TEXT_MODE;
-FREE_TEXT: .*? EOF;
-
-mode SOURCE;
 DOLLAR_ENTRY: '$ENTRY' {Column == Text.Length}?;
 DOLLAR_NAME:
 	'$NAME' {Column == Text.Length}? -> pushMode(NAME_DECLARE);
@@ -228,8 +223,8 @@ POST_INCLUDE_FREE_TEXT:
 POST_INCLUDE_NEWLINE: NL -> type(NL), channel(HIDDEN), popMode;
 
 mode END_OF_SOURCE;
-END_TEXT:
-	FREE_TEXT -> type(FREE_TEXT), channel(COMMENTS_CHANNEL);
+FREE_TEXT:
+	.*? EOF -> channel(COMMENTS_CHANNEL);
 
 mode COMMENT_MODE;
 COMMENT_END1:

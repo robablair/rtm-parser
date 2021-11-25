@@ -5,24 +5,17 @@ options {
 }
 
 start:
-	rtm_source
-	| FREE_TEXT+; // for files that are included with '$INCLUDE FILENAME'
-
-rtm_source: (
-		SOURCE_DESCRIPTION (overlay | name_definition)*
-	)? (source_end | EOF);
+	SOURCE_DESCRIPTION (overlay | name_definition)* (
+		source_end
+		| EOF
+	);
 
 overlay:
 	overlay_name name_definition* files? name_definition* (
 		data_area
 		| name_definition
 		| NL
-	)* ext? prog (
-		proc
-		| abort
-		| name_include
-		| statement
-	)*;
+	)* ext? prog (proc | abort | name_include | statement)*;
 //statements outide of procs? Probably a mistake, does RTM not produce compile error?
 
 source_end: DOLLAR_END;
@@ -75,13 +68,9 @@ code_string_mask:
 code_string_delim: HAT (WS* NL (NL | WS)* HAT)?;
 code_string_value: (CODE_STRING_VALUE | WS)+;
 
-parameter_list: (assignable | STAR) (
-		COMMA* (assignable | STAR)
-	)*;
+parameter_list: (assignable | STAR) (COMMA* (assignable | STAR))*;
 call_parameter_list:
-	LB argument_list? (
-		COLON call_return_parameter_list?
-	)? RB;
+	LB argument_list? (COLON call_return_parameter_list?)? RB;
 argument_list: (argument | COMMA) (COMMA* argument)* COMMA?;
 call_return_parameter_list:
 	call_return_parameter (COMMA? call_return_parameter)*;
@@ -95,11 +84,9 @@ argument:
 	| (MINUS | PLUS) expression
 	| REPEAT
 	| APOSTROPHE? expression;
-return_statement_list:
-	LB (expression (COMMA+ expression)*)? RB;
+return_statement_list: LB (expression (COMMA+ expression)*)? RB;
 
-prog:
-	DOLLAR_PROG LB parameter_list? RB statement*;
+prog: DOLLAR_PROG LB parameter_list? RB statement*;
 
 proc:
 	ID PROC (LB parameter_list? RB)? statement* ENDPROC (
@@ -111,45 +98,46 @@ abort:
 
 terminator_statement: return | QUITZUG | DIE LB argument RB;
 
+conditional:
+	LB conditional RB
+	| expression (
+		EQUAL
+		| NOT_EQUAL
+		| LESS_THAN
+		| MORE_THAN
+		| LESS_OR_EQUAL
+		| MORE_OR_EQUAL
+	) expression conditional_chain*
+	| conditional (AND | OR) conditional conditional_chain*;
+
+conditional_chain: (AND | OR) (
+		EQUAL
+		| NOT_EQUAL
+		| LESS_THAN
+		| MORE_THAN
+		| LESS_OR_EQUAL
+		| MORE_OR_EQUAL
+	) expression;
+
 expression:
 	LB expression RB							# parenthesis
 	| assignable (ASSIGN | ADD_TO) expression	# assignmentExpr
-	| op = (
-		EQUAL
-		| NOT_EQUAL
-		| LESS_THAN
-		| MORE_THAN
-		| LESS_OR_EQUAL
-		| MORE_OR_EQUAL
-	) right = expression # comparison
-	| left = expression op = (
-		EQUAL
-		| NOT_EQUAL
-		| LESS_THAN
-		| MORE_THAN
-		| LESS_OR_EQUAL
-		| MORE_OR_EQUAL
-	) right = expression															# comparison
-	| left = expression op = (AND | OR) right = expression						# conditional
-	| op = (MINUS | INCREMENT | DECREMENT) expression									# unary
-	| left = expression op = (BIT_AND | BIT_OR | BIT_XOR) right = expression	# infix
-	| left = expression op = (
-		BIT_SHIFT_LEFT
-		| BIT_SHIFT_RIGHT
-	) right = expression # infix
+	| op = (MINUS | INCREMENT | DECREMENT) expression								# unary
+	| left = expression op = (BIT_AND | BIT_OR | BIT_XOR) right = expression		# infix
+	| left = expression op = (BIT_SHIFT_LEFT | BIT_SHIFT_RIGHT) right = expression	# infix
 	| left = expression op = (
 		STAR
 		| SLASH
 		| DOUBLE_SLASH
 		| SLASH_COLON
-	) right = expression											# infix
+	) right = expression										# infix
 	| left = expression op = (PLUS | MINUS) right = expression	# infix
-	| value = function_call												# function
-	| value = if_expression												# if
-	| value = case_expression											# case
-	| value = expression bracket_expression								# bracket
-	| value = literal													# literalExpr
-	| value = identifier_expression										# identifier;
+	| value = function_call										# function
+	| value = if_expression										# if
+	| value = case_expression									# case
+	| value = expression bracket_expression						# bracket
+	| value = literal											# literalExpr
+	| value = identifier_expression								# identifier;
 
 identifier_expression: ID | FIELD_ID | AT_VARIABLE;
 
@@ -169,8 +157,8 @@ statement:
 
 do_block: DO statement* END;
 
-while_statement: WHILE expression statement;
-until_statement: UNTIL expression statement;
+while_statement: WHILE conditional statement;
+until_statement: UNTIL conditional statement;
 repeat_statement: REPEAT statement;
 always_statement: ALWAYS statement;
 never_statement: NEVER statement;
@@ -183,9 +171,7 @@ bracket_expression:
 	)* RSB;
 
 if_expression:
-	IF expression THEN? statement (
-		ELSE statement
-	)?;
+	IF conditional THEN? statement (ELSE statement)?;
 
 case_expression: CASE expression statement+ ENDCASE;
 
